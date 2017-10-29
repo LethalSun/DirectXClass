@@ -102,7 +102,7 @@ ID3D11PixelShader *g_pPickedPixelShader = NULL;
 Camera g_Camera;
 float g_ClientWidth = 800.f;
 float g_ClientHeight = 600.f;
-
+float g_PickRange = 15.0f;
 D3D_FEATURE_LEVEL g_featureLevel = D3D_FEATURE_LEVEL_11_0;
 
 void InitMatrix()
@@ -220,7 +220,7 @@ void CreateHeightMapVB()
 		for (int x = 0; x < vertexCount; ++x)
 		{
 			int idx = x + (z*vertexCount);
-			g_gridVertex[idx].pos = XMFLOAT3(x, 0.f, z);//XMFLOAT3(x, sinf(idx) * 3.f, z);
+			g_gridVertex[idx].pos = XMFLOAT3(x, 1.0f, z);//XMFLOAT3(x, sinf(idx) * 3.f, z);
 			g_gridVertex[idx].color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 			g_gridVertex[idx].tex = XMFLOAT2(x / (float)(vertexCount - 1), z / (float)(vertexCount - 1));
 		}
@@ -743,6 +743,58 @@ void Pick(int sx, int sy)
 	}
 }
 
+float GetSinHeight(float stndHeight, float distance)
+{
+	auto normDist = distance / g_PickRange;
+
+	if (normDist > 1.0f) return FLT_MAX;
+
+	float sinInput = (float)1.57079632679489661923 + (float)1.57079632679489661923 * normDist;
+
+	return stndHeight * sinf(sinInput);
+};
+
+float GetDistanceBetweenTwoVerticesInXZPlane(float x1, float z1, float x2, float z2)
+{
+	auto dx = x1 - x2;
+	auto dz = z1 - z2;
+
+	auto dist = sqrtf(dx * dx + dz * dz);
+
+	return dist;
+};
+
+//Pick round range
+std::vector<int> GetVerticesInRange(int pickedTraingle, float range)
+{
+	std::vector<int>VertexIndicesInRange;
+
+	if (pickedTraingle == -1)
+	{
+		return VertexIndicesInRange;
+	}
+
+	auto refVertexIndex = g_GridIndices[(g_GridPickedTraingle * 3)];
+	auto refVertex = g_gridVertex[refVertexIndex];
+	for (int i = 0; i < numVertices; ++i)
+	{
+		auto distance = GetDistanceBetweenTwoVerticesInXZPlane(
+			refVertex.pos.x, 
+			refVertex.pos.z, 
+			g_gridVertex[i].pos.x, 
+			g_gridVertex[i].pos.z);
+
+		if (distance < range)
+		{
+			VertexIndicesInRange.push_back(i);
+		}
+
+	}
+
+	return VertexIndicesInRange;
+}
+
+
 LRESULT CALLBACK WndProc(HWND hWnd
 	, UINT message
 	, WPARAM wParam
@@ -831,26 +883,35 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 				g_Camera.Strafe(speed);
 
 			if (g_GridPickedTraingle != -1) {
-				int v1 = g_GridIndices[(g_GridPickedTraingle * 3)];
-				int v2 = g_GridIndices[(g_GridPickedTraingle * 3) + 1];
-				int v3 = g_GridIndices[(g_GridPickedTraingle * 3) + 2];
+
+				
 				float factor = 0.05f;
 
-				if (GetAsyncKeyState(VK_UP) & 0x8000) {
-					g_gridVertex[v1].pos.y += factor;
-					g_gridVertex[v2].pos.y += factor;
-					g_gridVertex[v3].pos.y += factor;
+				auto targetIndices = GetVerticesInRange(g_GridPickedTraingle,15.0f);
+				for (const auto& index : targetIndices)
+				{
 
-					UpdateGridVertices();
+					auto dist = GetDistanceBetweenTwoVerticesInXZPlane(
+						g_gridVertex[g_GridIndices[(g_GridPickedTraingle * 3)]].pos.x,
+						g_gridVertex[g_GridIndices[(g_GridPickedTraingle * 3)]].pos.z,
+						g_gridVertex[index].pos.x,
+						g_gridVertex[index].pos.z);
+
+					auto newHeight = GetSinHeight(g_gridVertex[g_GridIndices[(g_GridPickedTraingle * 3)]].pos.y, dist);
+
+					if (GetAsyncKeyState(VK_UP) & 0x8000) {
+						g_gridVertex[index].pos.y += factor*newHeight;
+
+						UpdateGridVertices();
+					}
+
+					if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
+						g_gridVertex[index].pos.y -= factor*newHeight;
+
+						UpdateGridVertices();
+					}
 				}
 
-				if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
-					g_gridVertex[v1].pos.y -= factor;
-					g_gridVertex[v2].pos.y -= factor;
-					g_gridVertex[v3].pos.y -= factor;
-
-					UpdateGridVertices();
-				}
 			}
 
 			Render(deltaTime);

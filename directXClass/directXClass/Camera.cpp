@@ -1,14 +1,14 @@
 #include "Camera.h"
 
 Camera::Camera()
-	: mPosition(0.0f, 0.0f, 0.0f),
+	: mPosition(100.0f, 0.0f, 0.0f),
 	mRight(1.0f, 0.0f, 0.0f),
 	mUp(0.0f, 1.0f, 0.0f),
-	mLook(0.0f, 0.0f, 1.0f)
+	mLook(0.0f, 1.0f, 1.0f)
 {
 	SetLens(XM_PIDIV2, 800.0f / (FLOAT)600.0f, 0.01f, 1000.0f);
 
-	XMVECTOR pos = XMVectorSet(-70.0f, 50.0f, -70.0f, 1.0f);
+	XMVECTOR pos = XMVectorSet(100.0f, 120.0f, 50.0f, 1.0f);
 	XMVECTOR target = XMVectorSet(50.0f, 0.0f, 50.0f, 0.0f);
 	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
